@@ -19,6 +19,7 @@
     "diff-match-patch": "^1.0.5",
     "dotenv": "^17.4.2",
     "framer-motion": "^12.42.2",
+    "gray-matter": "^4.0.3",
     "lucide-react": "^1.24.0",
     "marked": "^18.0.6",
     "next": "16.2.10",

@@ -1,0 +1,66 @@
+name: Security Review
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'prisma/**'
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: pnpm audit
+        run: pnpm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Claude Security Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          command: "/security-review"
+
+      - name: Check for Critical Issues
+        run: |
+          if [ -f claude-review-output.md ] && grep -qiE "(Critical|CRITICAL|高危)" claude-review-output.md; then
+            echo "::error::发现高危安全问题，请修复后重新提交"
+            exit 1
+          fi
+
+      - name: Post Security Report
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const reviewFile = path.join(process.env.GITHUB_WORKSPACE, 'claude-review-output.md');
+            if (!fs.existsSync(reviewFile)) return;
+
+            const body = fs.readFileSync(reviewFile, 'utf-8');
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## Security Review\n\n${body}`
+            });

@@ -1,0 +1,79 @@
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  claude-review:
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       contains(github.event.comment.body, '@claude'))
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude Code Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: "claude-sonnet-4-6-20250929"
+          max_tokens: 4096
+          timeout: 300
+
+      - name: Post Review as PR Comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // Read Claude's review output
+            const reviewFile = path.join(process.env.GITHUB_WORKSPACE, 'claude-review-output.md');
+            if (!fs.existsSync(reviewFile)) {
+              console.log('No review output file found');
+              return;
+            }
+
+            const reviewBody = fs.readFileSync(reviewFile, 'utf-8');
+
+            // Check for critical issues
+            const hasCritical = /(?:Critical|CRITICAL|critical|高危)/.test(reviewBody);
+
+            // Post review as PR comment
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## Claude Code Review
+
+            ${reviewBody}
+
+            ---
+            ${
+              hasCritical
+                ? ':warning: **高危问题已发现，合并已被阻止。** 请修复后重新提交。'
+                : ':white_check_mark: 未发现高危问题。'
+            }
+
+            > 在PR评论中输入 \`@claude\` 可以请求重新审查或询问代码相关的问题。`
+            });
+
+            // If critical issues found, fail the check
+            if (hasCritical) {
+              core.setFailed('高危安全问题发现，阻止合并');
+            }

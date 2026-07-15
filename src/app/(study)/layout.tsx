@@ -2,7 +2,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { StudyMonitor } from "@/components/pose/study-monitor";
+import dynamic from "next/dynamic";
+
+const StudyMonitor = dynamic(
+  () => import("@/components/pose/study-monitor").then((m) => ({ default: m.StudyMonitor })),
+  { ssr: false }
+);
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "学习看板", icon: "□" },

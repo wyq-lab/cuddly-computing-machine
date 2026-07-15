@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Pose } from "@mediapipe/pose";
+import "@mediapipe/pose";
 
 interface UsePoseOptions {
   onAbsence?: (absentMinutes: number) => void;
@@ -42,9 +42,17 @@ export function usePose({
       setIsCameraOn(true);
       startTime.current = Date.now();
 
-      // Initialize MediaPipe Pose
-      const pose = new Pose({
-        locateFile: (file) =>
+      // Initialize MediaPipe Pose (assigned to globalThis by the IIFE script)
+      const PoseClass = (globalThis as Record<string, unknown>).Pose as new (config?: {
+        locateFile?: (file: string) => string;
+      }) => {
+        setOptions(options: Record<string, unknown>): void;
+        onResults(callback: (results: { poseLandmarks?: unknown[] }) => void): void;
+        send(inputs: { image: HTMLVideoElement }): Promise<void>;
+        close(): Promise<void>;
+      };
+      const pose = new PoseClass({
+        locateFile: (file: string) =>
           `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
       });
 

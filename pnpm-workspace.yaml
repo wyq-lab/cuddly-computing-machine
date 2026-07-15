@@ -1,3 +1,6 @@
+onlyBuiltDependencies:
+  - sharp
+
 allowBuilds:
   '@prisma/engines': true
   prisma: true

@@ -1,0 +1,18 @@
+# 代码所有者 - 自动指派 PR 审查者
+# 格式: <文件模式> <@username或@team>
+
+# 全局所有者
+* @wyq-lab
+
+# CI/CD 配置
+.github/workflows/ @wyq-lab
+
+# 源代码
+src/ @wyq-lab
+
+# 文档
+docs/ @wyq-lab
+
+# 依赖
+package.json @wyq-lab
+pnpm-lock.yaml @wyq-lab

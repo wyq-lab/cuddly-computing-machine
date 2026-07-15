@@ -1,0 +1,14 @@
+name: project-specific
+description: 趣味过教资项目专用技能
+version: "1.0"
+
+capabilities:
+  - name: dev
+    description: 启动开发环境
+    command: pnpm dev
+  - name: test
+    description: 运行检查和构建
+    command: pnpm run lint && npx tsc --noEmit
+  - name: build
+    description: 构建项目
+    command: pnpm run build

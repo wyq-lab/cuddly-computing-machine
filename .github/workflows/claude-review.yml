@@ -29,7 +29,7 @@ jobs:
       - name: Claude Code Review
         uses: anthropics/claude-code-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          anthropic_api_key: ${{ secrets.DEEPSEEK_API_KEY }}
           model: "claude-sonnet-4-6-20250929"
           max_tokens: 4096
           timeout: 300

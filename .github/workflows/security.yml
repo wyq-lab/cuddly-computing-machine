@@ -36,7 +36,7 @@ jobs:
       - name: Claude Security Review
         uses: anthropics/claude-code-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          anthropic_api_key: ${{ secrets.DEEPSEEK_API_KEY }}
           command: "/security-review"
 
       - name: Check for Critical Issues

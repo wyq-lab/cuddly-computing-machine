@@ -3,10 +3,11 @@ import { prisma } from "@/lib/db";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const kaodian = await prisma.kaodian.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       variants: { where: { stage: "highschool" } },
     },

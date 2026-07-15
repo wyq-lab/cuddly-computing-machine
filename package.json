@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
+    "@libsql/client": "^0.17.4",
     "@mediapipe/pose": "^0.5.1675469404",
+    "@prisma/adapter-libsql": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

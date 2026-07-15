@@ -1,0 +1,12 @@
+{
+    "costControl": {
+    "dailyLimit": 10.0,
+    "monthlyLimit": 200.0,
+    "alertThreshold": 0.8,
+    "alertEmail": "admin@company.com",
+    "actions": {
+      "onDailyLimitReached": "warn",
+      "onMonthlyLimitReached": "block"
+    }
+  }
+}

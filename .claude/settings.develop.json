@@ -1,0 +1,9 @@
+{
+  "allowedTools": [
+    "*"  // 开发时允许所有工具
+  ],
+  "disallowedTools": [
+    "Bash(rm -rf /)",
+    "Bash(sudo *)"
+  ]
+}

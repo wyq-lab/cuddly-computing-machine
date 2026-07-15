@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -10,4 +5,117 @@ generator client {
 
 datasource db {
   provider = "sqlite"
+}
+
+model User {
+  id        String   @id
+  stage     String   @default("highschool")
+  baseLevel String   @default("beginner")
+  createdAt DateTime @default(now())
+  planDays  Int?
+  planStart DateTime?
+  streak    Int      @default(0)
+  lastActiveDate DateTime?
+
+  progress    UserProgress[]
+  wrongs      WrongQuestion[]
+  recite      ReciteRecord[]
+  sessions    StudySession[]
+  dailyPlans  DailyPlan[]
+}
+
+model Kaodian {
+  id       String @id @default(cuid())
+  code     String @unique
+  title    String
+  subject  String
+  content  String
+  keywords String
+
+  variants   KaodianVariant[]
+  questions  Question[]
+  userWrongs WrongQuestion[]
+  userRecites ReciteRecord[]
+}
+
+model KaodianVariant {
+  id             String  @id @default(cuid())
+  kaodianId      String
+  kaodian        Kaodian @relation(fields: [kaodianId], references: [id])
+  stage          String
+  examType       String
+  answerTemplate String
+}
+
+model Question {
+  id         String  @id @default(cuid())
+  kaodianId  String
+  kaodian    Kaodian @relation(fields: [kaodianId], references: [id])
+  type       String
+  stem       String
+  options    String?
+  answer     String
+  analysis   String
+  difficulty Int     @default(3)
+}
+
+model UserProgress {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  kaodianId String
+  status    Int      @default(0)
+  reciteLv  Int      @default(0)
+  weight    Float    @default(1.0)
+  clickCount Int     @default(0)
+  lastWrongAt DateTime?
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, kaodianId])
+}
+
+model WrongQuestion {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  questionId  String
+  kaodianId   String
+  kaodian     Kaodian  @relation(fields: [kaodianId], references: [id])
+  wrongAnswer String
+  retryCount  Int      @default(0)
+  mastered    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model ReciteRecord {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  kaodianId String
+  kaodian   Kaodian  @relation(fields: [kaodianId], references: [id])
+  level     Int
+  score     Int
+  createdAt DateTime @default(now())
+}
+
+model StudySession {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  startTime DateTime
+  endTime   DateTime?
+  duration  Int?
+  createdAt DateTime @default(now())
+}
+
+model DailyPlan {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  dayIndex  Int
+  kaodianIds String  // JSON array of kaodian IDs
+  completed Boolean  @default(false)
+  date      DateTime?
+
+  @@unique([userId, dayIndex])
 }

@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { StudyMonitor } from "@/components/pose/study-monitor";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "学习看板", icon: "□" },
@@ -20,6 +21,7 @@ export default function StudyLayout({
 
   return (
     <div className="flex h-screen">
+      <StudyMonitor />
       {/* Sidebar */}
       <aside className="w-56 border-r border-border bg-card flex-shrink-0 hidden md:flex flex-col">
         <div className="p-4 border-b border-border">

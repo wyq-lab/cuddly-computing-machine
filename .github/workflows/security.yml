@@ -17,6 +17,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
         with:
@@ -33,16 +35,38 @@ jobs:
         run: pnpm audit --audit-level=high
         continue-on-error: true
 
-      - name: Claude Security Review
-        uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_api_key: ${{ secrets.DEEPSEEK_API_KEY }}
-          command: "/security-review"
-
-      - name: Check for Critical Issues
+      - name: DeepSeek Security Review
         run: |
-          if [ -f claude-review-output.md ] && grep -qiE "(Critical|CRITICAL|高危)" claude-review-output.md; then
-            echo "::error::发现高危安全问题，请修复后重新提交"
+          git diff origin/${{ github.base_ref }}...HEAD > /tmp/diff.txt 2>/dev/null || \
+          git diff HEAD~1 > /tmp/diff.txt
+
+          DIFF=$(cat /tmp/diff.txt | head -c 6000 | jq -Rs .)
+
+          RESPONSE=$(curl -s https://api.deepseek.com/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.DEEPSEEK_API_KEY }}" \
+            -d "{
+              \"model\": \"deepseek-chat\",
+              \"messages\": [
+                {
+                  \"role\": \"system\",
+                  \"content\": \"你是安全审查专家。审查以下代码变更的安全问题：SQL注入、XSS、CSRF、敏感信息泄露、不安全的依赖、权限问题。如发现高危问题行首标注【Critical】。用中文Markdown输出。\"
+                },
+                {
+                  \"role\": \"user\",
+                  \"content\": ${DIFF}
+                }
+              ],
+              \"max_tokens\": 4096,
+              \"temperature\": 0.3
+            }")
+
+          REVIEW=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // .error.message')
+          echo "$REVIEW" > /tmp/security-output.md
+          cat /tmp/security-output.md
+
+          if grep -qiE "(Critical|CRITICAL|【Critical】|高危)" /tmp/security-output.md; then
+            echo "::error::发现高危安全问题，阻止合并"
             exit 1
           fi
 
@@ -52,15 +76,12 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const path = require('path');
-
-            const reviewFile = path.join(process.env.GITHUB_WORKSPACE, 'claude-review-output.md');
+            const reviewFile = '/tmp/security-output.md';
             if (!fs.existsSync(reviewFile)) return;
-
             const body = fs.readFileSync(reviewFile, 'utf-8');
             await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `## Security Review\n\n${body}`
+              body: `## DeepSeek Security Review\n\n${body}`
             });

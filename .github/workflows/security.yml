@@ -2,14 +2,13 @@ name: Security Review
 
 on:
   pull_request:
-    paths:
-      - 'src/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'prisma/**'
+    branches: [master]
+  push:
+    branches: [master]
 
 jobs:
   security:
+    name: Security Scan
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -27,39 +26,43 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
 
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install
 
       - name: pnpm audit
         run: pnpm audit --audit-level=high
         continue-on-error: true
 
       - name: DeepSeek Security Review
+        if: github.event_name == 'pull_request'
         run: |
-          git diff origin/${{ github.base_ref }}...HEAD > /tmp/diff.txt 2>/dev/null || \
-          git diff HEAD~1 > /tmp/diff.txt
+          git fetch origin ${{ github.base_ref }}
+          git diff origin/${{ github.base_ref }}...HEAD > /tmp/diff.txt
 
-          DIFF=$(cat /tmp/diff.txt | head -c 6000 | jq -Rs .)
+          DIFF_TEXT=$(cat /tmp/diff.txt | head -c 6000)
+
+          REQUEST_BODY=$(jq -n \
+            --arg diff "$DIFF_TEXT" \
+            '{
+              model: "deepseek-chat",
+              messages: [
+                {
+                  role: "system",
+                  content: "你是安全审查专家。审查以下代码变更的安全问题：SQL注入、XSS、CSRF、敏感信息泄露、不安全的依赖、权限问题。如发现高危问题行首标注【Critical】。用中文Markdown输出。"
+                },
+                {
+                  role: "user",
+                  content: "\($diff)"
+                }
+              ],
+              max_tokens: 4096,
+              temperature: 0.3
+            }')
 
           RESPONSE=$(curl -s https://api.deepseek.com/chat/completions \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.DEEPSEEK_API_KEY }}" \
-            -d "{
-              \"model\": \"deepseek-chat\",
-              \"messages\": [
-                {
-                  \"role\": \"system\",
-                  \"content\": \"你是安全审查专家。审查以下代码变更的安全问题：SQL注入、XSS、CSRF、敏感信息泄露、不安全的依赖、权限问题。如发现高危问题行首标注【Critical】。用中文Markdown输出。\"
-                },
-                {
-                  \"role\": \"user\",
-                  \"content\": ${DIFF}
-                }
-              ],
-              \"max_tokens\": 4096,
-              \"temperature\": 0.3
-            }")
+            -d "$REQUEST_BODY")
 
           REVIEW=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // .error.message')
           echo "$REVIEW" > /tmp/security-output.md
@@ -71,7 +74,7 @@ jobs:
           fi
 
       - name: Post Security Report
-        if: always()
+        if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
@@ -83,5 +86,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `## DeepSeek Security Review\n\n${body}`
+              body: ['## DeepSeek Security Review', '', body].join('\n')
             });

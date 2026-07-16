@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   claude-review:
+    name: Code Review
     if: |
       github.event_name == 'pull_request' ||
       (github.event_name == 'issue_comment' &&
@@ -45,26 +46,30 @@ jobs:
       - name: DeepSeek Code Review
         id: review
         run: |
-          DIFF=$(cat /tmp/pr_diff.txt | head -c 8000 | jq -Rs .)
+          DIFF_TEXT=$(cat /tmp/pr_diff.txt | head -c 8000)
+
+          REQUEST_BODY=$(jq -n \
+            --arg diff "$DIFF_TEXT" \
+            '{
+              model: "deepseek-chat",
+              messages: [
+                {
+                  role: "system",
+                  content: "你是代码审查专家。请审查以下 PR diff，用中文输出：\n1. 代码质量问题\n2. 潜在 Bug\n3. 安全漏洞（如有高危问题请在行首标注【Critical】）\n4. 改进建议\n\n用 Markdown 格式输出。如果没有问题请说明。"
+                },
+                {
+                  role: "user",
+                  content: "请审查这个 PR：\n\n```diff\n\($diff)\n```"
+                }
+              ],
+              max_tokens: 4096,
+              temperature: 0.3
+            }')
 
           RESPONSE=$(curl -s https://api.deepseek.com/chat/completions \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.DEEPSEEK_API_KEY }}" \
-            -d "{
-              \"model\": \"deepseek-chat\",
-              \"messages\": [
-                {
-                  \"role\": \"system\",
-                  \"content\": \"你是代码审查专家。请审查以下 PR diff，用中文输出：\n1. 代码质量问题\n2. 潜在 Bug\n3. 安全漏洞（如有高危问题请在行首标注【Critical】）\n4. 改进建议\n\n用 Markdown 格式输出。如果没有问题请说明。\"
-                },
-                {
-                  \"role\": \"user\",
-                  \"content\": \"请审查这个 PR：\n\n\`\`\`diff\n${DIFF}\n\`\`\`\"
-                }
-              ],
-              \"max_tokens\": 4096,
-              \"temperature\": 0.3
-            }")
+            -d "$REQUEST_BODY")
 
           REVIEW=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // .error.message')
           echo "$REVIEW" > /tmp/review-output.md
@@ -79,15 +84,24 @@ jobs:
             const reviewBody = fs.readFileSync('/tmp/review-output.md', 'utf-8');
             const hasCritical = /(?:Critical|CRITICAL|【Critical】|高危)/.test(reviewBody);
 
+            const comment = [
+              '## DeepSeek Code Review',
+              '',
+              reviewBody,
+              '',
+              '---',
+              hasCritical
+                ? ':warning: **高危问题已发现，合并已被阻止。** 请修复后重新提交。'
+                : ':white_check_mark: 未发现高危问题。',
+              '',
+              '> 在PR评论中输入 `@claude` 可请求重新审查。'
+            ].join('\n');
+
             await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `## DeepSeek Code Review\n\n${reviewBody}\n\n---\n${
-                hasCritical
-                  ? ':warning: **高危问题已发现，合并已被阻止。** 请修复后重新提交。'
-                  : ':white_check_mark: 未发现高危问题。'
-              }\n\n> 在PR评论中输入 \`@claude\` 可请求重新审查。`
+              body: comment
             });
 
             if (hasCritical) {

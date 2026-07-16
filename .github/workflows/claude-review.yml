@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   claude-review:
+    name: Code Review
     if: |
       github.event_name == 'pull_request' ||
       (github.event_name == 'issue_comment' &&

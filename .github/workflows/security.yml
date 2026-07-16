@@ -2,14 +2,13 @@ name: Security Review
 
 on:
   pull_request:
-    paths:
-      - 'src/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'prisma/**'
+    branches: [master]
+  push:
+    branches: [master]
 
 jobs:
   security:
+    name: Security Scan
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -36,9 +35,10 @@ jobs:
         continue-on-error: true
 
       - name: DeepSeek Security Review
+        if: github.event_name == 'pull_request'
         run: |
-          git diff origin/${{ github.base_ref }}...HEAD > /tmp/diff.txt 2>/dev/null || \
-          git diff HEAD~1 > /tmp/diff.txt
+          git fetch origin ${{ github.base_ref }}
+          git diff origin/${{ github.base_ref }}...HEAD > /tmp/diff.txt
 
           DIFF=$(cat /tmp/diff.txt | head -c 6000 | jq -Rs .)
 
@@ -71,7 +71,7 @@ jobs:
           fi
 
       - name: Post Security Report
-        if: always()
+        if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |

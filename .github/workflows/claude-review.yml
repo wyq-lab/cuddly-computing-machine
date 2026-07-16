@@ -26,10 +26,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Generate PR diff
+      - name: Get PR diff
         run: |
-          git diff origin/${{ github.base_ref }}...HEAD > /tmp/pr_diff.txt 2>/dev/null || \
-          git diff HEAD~1 > /tmp/pr_diff.txt
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin ${{ github.base_ref }}
+            git diff origin/${{ github.base_ref }}...HEAD > /tmp/pr_diff.txt
+          else
+            PR_NUMBER=${{ github.event.issue.number }}
+            PR_DATA=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/pulls/$PR_NUMBER")
+            BASE_REF=$(echo "$PR_DATA" | jq -r '.base.ref')
+            HEAD_REF=$(echo "$PR_DATA" | jq -r '.head.ref')
+            git fetch origin "$BASE_REF" "$HEAD_REF"
+            git diff "origin/$BASE_REF...origin/$HEAD_REF" > /tmp/pr_diff.txt
+          fi
           echo "Diff size: $(wc -l < /tmp/pr_diff.txt) lines"
 
       - name: DeepSeek Code Review
@@ -61,7 +71,7 @@ jobs:
           echo "review_done=true" >> "$GITHUB_OUTPUT"
 
       - name: Post Review as PR Comment
-        if: steps.review.outputs.review_done == 'true' && github.event_name == 'pull_request'
+        if: steps.review.outputs.review_done == 'true'
         uses: actions/github-script@v7
         with:
           script: |

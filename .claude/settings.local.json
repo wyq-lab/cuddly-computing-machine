@@ -23,7 +23,8 @@
       "Bash(pnpm install *)",
       "Bash(rm .npmrc)",
       "Bash(pnpm rebuild *)",
-      "Bash(echo 'onlyBuiltDependencies[]=sharp')"
+      "Bash(echo 'onlyBuiltDependencies[]=sharp')",
+      "Bash(git push *)"
     ]
   }
 }

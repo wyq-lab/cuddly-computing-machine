@@ -84,15 +84,24 @@ jobs:
             const reviewBody = fs.readFileSync('/tmp/review-output.md', 'utf-8');
             const hasCritical = /(?:Critical|CRITICAL|【Critical】|高危)/.test(reviewBody);
 
+            const comment = [
+              '## DeepSeek Code Review',
+              '',
+              reviewBody,
+              '',
+              '---',
+              hasCritical
+                ? ':warning: **高危问题已发现，合并已被阻止。** 请修复后重新提交。'
+                : ':white_check_mark: 未发现高危问题。',
+              '',
+              '> 在PR评论中输入 `@claude` 可请求重新审查。'
+            ].join('\n');
+
             await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `## DeepSeek Code Review\n\n${reviewBody}\n\n---\n${
-                hasCritical
-                  ? ':warning: **高危问题已发现，合并已被阻止。** 请修复后重新提交。'
-                  : ':white_check_mark: 未发现高危问题。'
-              }\n\n> 在PR评论中输入 \`@claude\` 可请求重新审查。`
+              body: comment
             });
 
             if (hasCritical) {
